@@ -34,4 +34,3 @@ En 2 minutos tendrás una URL pública tipo `enfermeria-opos.vercel.app`.
 npm install
 npm run dev
 ```
-"# OPOS-ENFERMERIA" 
