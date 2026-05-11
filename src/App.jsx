@@ -19,121 +19,33 @@ const ICONS = {
   "Seguridad del Paciente y Calidad Asistencial":"🛡️"
 };
 
-const SK = "enf_opos_v3";
+const SK = "enf_opos_v4";
+const TK = "enf_theme_v1";
 const load = () => { try { return JSON.parse(localStorage.getItem(SK)) || {}; } catch { return {}; } };
+const loadTheme = () => { try { return localStorage.getItem(TK) || "dark"; } catch { return "dark"; } };
 const save = (s) => { try { localStorage.setItem(SK, JSON.stringify(s)); } catch {} };
+const saveTheme = (t) => { try { localStorage.setItem(TK, t); } catch {} };
 const shuffle = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];} return b; };
 const fmt = s => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,"0")}`;
 
-const C = {
+const DARK = {
   bg:"#080d1a", sur:"#0f172a", card:"#162032", border:"#1e2d42",
   acc:"#38bdf8", green:"#34d399", red:"#f87171", yellow:"#fbbf24",
-  text:"#e2e8f0", muted:"#475569", purple:"#a78bfa"
+  text:"#e2e8f0", muted:"#475569", purple:"#a78bfa", subtext:"#94a3b8"
 };
 
-const s = {
-  app:{minHeight:"100vh",background:C.bg,color:C.text,fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:40},
-  topBar:{display:"flex",alignItems:"center",padding:"14px 16px",background:C.sur,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:20,gap:8},
-  backBtn:{background:"none",border:"none",color:C.acc,cursor:"pointer",fontSize:14,fontWeight:700,padding:"4px 0",flexShrink:0},
-  topTitle:{flex:1,textAlign:"center",fontSize:15,fontWeight:700,margin:0},
-  topMeta:{fontSize:12,color:C.muted,flexShrink:0},
-  hero:{background:"linear-gradient(160deg,#0f2544 0%,#080d1a 60%)",padding:"32px 20px 28px",textAlign:"center",borderBottom:`1px solid ${C.border}`},
-  heroEmoji:{fontSize:52,marginBottom:8,display:"block"},
-  heroTitle:{margin:0,fontSize:30,fontWeight:900,letterSpacing:-1},
-  heroSub:{margin:"6px 0 22px",color:C.muted,fontSize:13},
-  statsRow:{display:"inline-flex",background:"rgba(255,255,255,0.05)",borderRadius:14,padding:"12px 8px",gap:0},
-  stat:{display:"flex",flexDirection:"column",alignItems:"center",padding:"0 18px"},
-  statN:{fontSize:22,fontWeight:800,color:C.acc},
-  statL:{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:1},
-  statDiv:{width:1,height:30,background:C.border,alignSelf:"center"},
-  grid:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,padding:"16px"},
-  mBtn:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:"22px 10px",borderRadius:18,border:"none",cursor:"pointer",fontSize:13,fontWeight:700},
-  mBtnBlue:{background:"linear-gradient(135deg,#1d4ed8,#3b82f6)",color:"#fff"},
-  mBtnGreen:{background:"linear-gradient(135deg,#065f46,#10b981)",color:"#fff"},
-  mBtnPurple:{background:"linear-gradient(135deg,#5b21b6,#8b5cf6)",color:"#fff"},
-  mBtnGold:{background:"linear-gradient(135deg,#78350f,#f59e0b)",color:"#fff"},
-  mIcon:{fontSize:30},
-  progSection:{padding:"0 16px 16px"},
-  progLabel:{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:6},
-  progBar:{height:8,background:C.sur,borderRadius:4,overflow:"hidden"},
-  progFill:{height:"100%",background:`linear-gradient(90deg,${C.acc},${C.green})`,transition:"width 0.6s"},
-  progTxt:{fontSize:12,color:C.muted,marginTop:4},
-  tList:{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10},
-  tCard:{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"14px 16px",cursor:"pointer",textAlign:"left",color:C.text},
-  tTop:{display:"flex",alignItems:"center",gap:12,marginBottom:8},
-  tIcon:{fontSize:22,flexShrink:0},
-  tInfo:{flex:1},
-  tName:{fontSize:13,fontWeight:700,display:"block"},
-  tMeta:{fontSize:11,color:C.muted},
-  tPct:{fontSize:14,fontWeight:800,color:C.acc},
-  tBar:{height:4,background:C.sur,borderRadius:2,overflow:"hidden"},
-  tFill:{height:"100%",background:C.acc,transition:"width 0.5s"},
-  cardWrap:{padding:"16px"},
-  tag:{display:"inline-block",background:"rgba(56,189,248,0.12)",color:C.acc,borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:700,marginBottom:10},
-  disputed:{display:"inline-block",background:"rgba(251,191,36,0.12)",color:C.yellow,borderRadius:20,padding:"3px 10px",fontSize:10,fontWeight:700,marginLeft:8},
-  qNum:{color:C.muted,fontSize:11,marginBottom:6,textTransform:"uppercase",letterSpacing:1},
-  qTxt:{fontSize:15,fontWeight:600,lineHeight:1.65,marginBottom:18,color:"#dde6f0"},
-  opts:{display:"flex",flexDirection:"column",gap:9},
-  opt:{display:"flex",alignItems:"flex-start",gap:10,background:C.card,border:`1.5px solid ${C.border}`,borderRadius:12,padding:"12px 14px",cursor:"pointer",color:C.text,textAlign:"left",transition:"all 0.15s"},
-  optSel:{border:`1.5px solid ${C.acc}`,background:"rgba(56,189,248,0.08)"},
-  optOk:{border:`1.5px solid ${C.green}`,background:"rgba(52,211,153,0.1)"},
-  optBad:{border:`1.5px solid ${C.red}`,background:"rgba(248,113,113,0.09)"},
-  optKey:{background:C.sur,borderRadius:6,padding:"2px 8px",fontSize:12,fontWeight:800,color:C.acc,flexShrink:0,marginTop:1},
-  optKeyOk:{color:C.green},
-  optKeyBad:{color:C.red},
-  optVal:{fontSize:13,lineHeight:1.5},
-  resOk:{marginTop:14,background:"rgba(52,211,153,0.12)",border:`1px solid ${C.green}`,borderRadius:10,padding:"10px 16px",fontSize:14,fontWeight:700,color:C.green,textAlign:"center"},
-  resBad:{marginTop:14,background:"rgba(248,113,113,0.1)",border:`1px solid ${C.red}`,borderRadius:10,padding:"10px 16px",fontSize:14,fontWeight:700,color:C.red,textAlign:"center"},
-  navRow:{display:"flex",gap:10,padding:"0 16px"},
-  navBtn:{flex:1,padding:"14px",borderRadius:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,cursor:"pointer",fontSize:14,fontWeight:700},
-  navBtnPri:{background:C.acc,border:"none",color:"#0f172a"},
-  setup:{padding:"20px 16px",display:"flex",flexDirection:"column",gap:16},
-  label:{fontSize:11,textTransform:"uppercase",letterSpacing:1,color:C.muted,fontWeight:700},
-  cntRow:{display:"flex",gap:10},
-  cntBtn:{flex:1,padding:"13px 6px",borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontSize:16,fontWeight:800},
-  cntBtnA:{background:"rgba(56,189,248,0.15)",border:`1.5px solid ${C.acc}`,color:C.acc},
-  sel:{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:"13px 14px",color:C.text,fontSize:13,width:"100%"},
-  startBtn:{background:"linear-gradient(135deg,#5b21b6,#8b5cf6)",border:"none",borderRadius:14,padding:"16px",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer",marginTop:4},
-  examProg:{flex:1,textAlign:"center",fontSize:14,fontWeight:800},
-  examTimer:{fontSize:13,color:C.yellow,fontWeight:800},
-  examBar:{height:3,background:C.sur},
-  examFill:{height:"100%",background:C.acc,transition:"width 0.3s"},
-  navBtnSubmit:{background:"linear-gradient(135deg,#5b21b6,#8b5cf6)",border:"none",color:"#fff"},
-  resCard:{padding:"20px 16px"},
-  bigScore:{fontSize:76,fontWeight:900,textAlign:"center",lineHeight:1,marginBottom:4},
-  resMeta:{display:"flex",justifyContent:"center",gap:20,fontSize:13,color:C.muted,marginBottom:16},
-  reviewList:{display:"flex",flexDirection:"column",gap:7,marginBottom:20},
-  revItem:{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:10,border:"1px solid"},
-  revOk:{background:"rgba(52,211,153,0.07)",borderColor:"rgba(52,211,153,0.25)"},
-  revBad:{background:"rgba(248,113,113,0.07)",borderColor:"rgba(248,113,113,0.25)"},
-  revSkip:{background:C.card,borderColor:C.border},
-  revNum:{fontSize:11,color:C.muted,fontWeight:700,flexShrink:0,width:36},
-  revTxt:{flex:1,fontSize:12,color:C.text},
-  revAns:{fontSize:13,fontWeight:800,flexShrink:0},
-  recBody:{padding:"16px"},
-  gRow:{display:"flex",gap:10,marginBottom:20},
-  gBox:{flex:1,background:C.card,borderRadius:12,padding:"14px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:3},
-  gN:{fontSize:22,fontWeight:900,color:C.acc},
-  gL:{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:0.5,textAlign:"center"},
-  secTitle:{fontSize:12,fontWeight:800,color:C.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:10},
-  empty:{color:C.muted,fontSize:14,textAlign:"center",padding:"24px 0"},
-  exRec:{display:"flex",justifyContent:"space-between",alignItems:"center",background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:"13px 15px",marginBottom:8},
-  exRL:{display:"flex",flexDirection:"column",gap:3},
-  exRDate:{fontSize:13,fontWeight:600},
-  exRTopic:{fontSize:11,color:C.muted},
-  exRR:{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3},
-  exRScore:{fontSize:17,fontWeight:900},
-  exRTime:{fontSize:11,color:C.muted},
-  resetZone:{marginTop:24},
-  resetBtn:{width:"100%",padding:"14px",borderRadius:12,border:"1px solid rgba(248,113,113,0.35)",background:"rgba(248,113,113,0.07)",color:C.red,cursor:"pointer",fontSize:14,fontWeight:700},
-  confBox:{background:"rgba(248,113,113,0.09)",border:`1px solid ${C.red}`,borderRadius:12,padding:"16px"},
-  confTxt:{fontSize:14,color:C.text,marginBottom:12,textAlign:"center",margin:"0 0 12px"},
-  confBtns:{display:"flex",gap:10},
-  confY:{flex:1,padding:"12px",borderRadius:10,border:"none",background:C.red,color:"#fff",cursor:"pointer",fontWeight:800,fontSize:14},
-  confN:{flex:1,padding:"12px",borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,cursor:"pointer",fontWeight:800,fontSize:14},
+const LIGHT = {
+  bg:"#f0f4f8", sur:"#ffffff", card:"#ffffff", border:"#d1dce8",
+  acc:"#0284c7", green:"#059669", red:"#dc2626", yellow:"#d97706",
+  text:"#0f172a", muted:"#64748b", purple:"#7c3aed", subtext:"#475569"
 };
+
+const shuffle2 = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];} return b; };
 
 export default function App() {
+  const [theme, setTheme] = useState(loadTheme);
+  const C = theme === "dark" ? DARK : LIGHT;
+
   const [data, setData] = useState(load);
   const [screen, setScreen] = useState("home");
   const [studyQ, setStudyQ] = useState([]);
@@ -151,11 +63,14 @@ export default function App() {
   const timer = useRef(null);
 
   useEffect(() => { save(data); }, [data]);
+  useEffect(() => { saveTheme(theme); }, [theme]);
   useEffect(() => {
     if (eActive) { timer.current = setInterval(() => setETime(t => t+1), 1000); }
     else clearInterval(timer.current);
     return () => clearInterval(timer.current);
   }, [eActive]);
+
+  const toggleTheme = () => setTheme(t => t === "dark" ? "light" : "dark");
 
   const hist = data.history || {};
   const histNums = Object.keys(hist);
@@ -163,6 +78,110 @@ export default function App() {
   const totalCorrect = histNums.filter(n => hist[n]?.correct).length;
   const accuracy = totalSeen > 0 ? Math.round((totalCorrect/totalSeen)*100) : 0;
   const examHist = data.exams || [];
+
+  // Dynamic styles based on theme
+  const s = {
+    app:{minHeight:"100vh",background:C.bg,color:C.text,fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:40},
+    topBar:{display:"flex",alignItems:"center",padding:"14px 16px",background:C.sur,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:20,gap:8,boxShadow:theme==="light"?"0 1px 3px rgba(0,0,0,0.08)":"none"},
+    backBtn:{background:"none",border:"none",color:C.acc,cursor:"pointer",fontSize:14,fontWeight:700,padding:"4px 0",flexShrink:0},
+    topTitle:{flex:1,textAlign:"center",fontSize:15,fontWeight:700,margin:0,color:C.text},
+    topMeta:{fontSize:12,color:C.muted,flexShrink:0},
+    themeBtn:{background:"none",border:`1px solid ${C.border}`,borderRadius:20,padding:"4px 10px",cursor:"pointer",fontSize:13,color:C.muted,flexShrink:0},
+    hero:{background:theme==="dark"?"linear-gradient(160deg,#0f2544 0%,#080d1a 60%)":"linear-gradient(160deg,#e0f2fe 0%,#f0f4f8 60%)",padding:"32px 20px 28px",textAlign:"center",borderBottom:`1px solid ${C.border}`},
+    heroEmoji:{fontSize:52,marginBottom:8,display:"block"},
+    heroTitle:{margin:0,fontSize:30,fontWeight:900,letterSpacing:-1,color:C.text},
+    heroSub:{margin:"6px 0 22px",color:C.muted,fontSize:13},
+    statsRow:{display:"inline-flex",background:theme==="dark"?"rgba(255,255,255,0.05)":"rgba(0,0,0,0.05)",borderRadius:14,padding:"12px 8px",gap:0},
+    stat:{display:"flex",flexDirection:"column",alignItems:"center",padding:"0 18px"},
+    statN:{fontSize:22,fontWeight:800,color:C.acc},
+    statL:{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:1},
+    statDiv:{width:1,height:30,background:C.border,alignSelf:"center"},
+    grid:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,padding:"16px"},
+    mBtn:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:"22px 10px",borderRadius:18,border:"none",cursor:"pointer",fontSize:13,fontWeight:700},
+    mBtnBlue:{background:"linear-gradient(135deg,#1d4ed8,#3b82f6)",color:"#fff"},
+    mBtnGreen:{background:"linear-gradient(135deg,#065f46,#10b981)",color:"#fff"},
+    mBtnPurple:{background:"linear-gradient(135deg,#5b21b6,#8b5cf6)",color:"#fff"},
+    mBtnGold:{background:"linear-gradient(135deg,#78350f,#f59e0b)",color:"#fff"},
+    mIcon:{fontSize:30},
+    progSection:{padding:"0 16px 16px"},
+    progLabel:{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:6},
+    progBar:{height:8,background:C.sur,borderRadius:4,overflow:"hidden",border:`1px solid ${C.border}`},
+    progFill:{height:"100%",background:`linear-gradient(90deg,${C.acc},${C.green})`,transition:"width 0.6s"},
+    progTxt:{fontSize:12,color:C.muted,marginTop:4},
+    tList:{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10},
+    tCard:{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"14px 16px",cursor:"pointer",textAlign:"left",color:C.text,boxShadow:theme==="light"?"0 1px 3px rgba(0,0,0,0.06)":"none"},
+    tTop:{display:"flex",alignItems:"center",gap:12,marginBottom:8},
+    tIcon:{fontSize:22,flexShrink:0},
+    tInfo:{flex:1},
+    tName:{fontSize:13,fontWeight:700,display:"block",color:C.text},
+    tMeta:{fontSize:11,color:C.muted},
+    tPct:{fontSize:14,fontWeight:800,color:C.acc},
+    tBar:{height:4,background:theme==="dark"?C.sur:"#e2e8f0",borderRadius:2,overflow:"hidden"},
+    tFill:{height:"100%",background:C.acc,transition:"width 0.5s"},
+    cardWrap:{padding:"16px"},
+    tag:{display:"inline-block",background:theme==="dark"?"rgba(56,189,248,0.12)":"rgba(2,132,199,0.1)",color:C.acc,borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:700,marginBottom:10},
+    disputed:{display:"inline-block",background:theme==="dark"?"rgba(251,191,36,0.12)":"rgba(217,119,6,0.1)",color:C.yellow,borderRadius:20,padding:"3px 10px",fontSize:10,fontWeight:700,marginLeft:8},
+    qNum:{color:C.muted,fontSize:11,marginBottom:6,textTransform:"uppercase",letterSpacing:1},
+    qTxt:{fontSize:15,fontWeight:600,lineHeight:1.65,marginBottom:18,color:C.text},
+    opts:{display:"flex",flexDirection:"column",gap:9},
+    opt:{display:"flex",alignItems:"flex-start",gap:10,background:C.card,border:`1.5px solid ${C.border}`,borderRadius:12,padding:"12px 14px",cursor:"pointer",color:C.text,textAlign:"left",transition:"all 0.15s",boxShadow:theme==="light"?"0 1px 2px rgba(0,0,0,0.04)":"none"},
+    optSel:{border:`1.5px solid ${C.acc}`,background:theme==="dark"?"rgba(56,189,248,0.08)":"rgba(2,132,199,0.08)"},
+    optOk:{border:`1.5px solid ${C.green}`,background:theme==="dark"?"rgba(52,211,153,0.1)":"rgba(5,150,105,0.08)"},
+    optBad:{border:`1.5px solid ${C.red}`,background:theme==="dark"?"rgba(248,113,113,0.09)":"rgba(220,38,38,0.06)"},
+    optKey:{background:theme==="dark"?C.sur:"#f1f5f9",borderRadius:6,padding:"2px 8px",fontSize:12,fontWeight:800,color:C.acc,flexShrink:0,marginTop:1},
+    optKeyOk:{color:C.green},
+    optKeyBad:{color:C.red},
+    optVal:{fontSize:13,lineHeight:1.5,color:C.text},
+    resOk:{marginTop:14,background:theme==="dark"?"rgba(52,211,153,0.12)":"rgba(5,150,105,0.08)",border:`1px solid ${C.green}`,borderRadius:10,padding:"10px 16px",fontSize:14,fontWeight:700,color:C.green,textAlign:"center"},
+    resBad:{marginTop:14,background:theme==="dark"?"rgba(248,113,113,0.1)":"rgba(220,38,38,0.06)",border:`1px solid ${C.red}`,borderRadius:10,padding:"10px 16px",fontSize:14,fontWeight:700,color:C.red,textAlign:"center"},
+    navRow:{display:"flex",gap:10,padding:"0 16px"},
+    navBtn:{flex:1,padding:"14px",borderRadius:12,border:`1px solid ${C.border}`,background:C.card,color:C.text,cursor:"pointer",fontSize:14,fontWeight:700},
+    navBtnPri:{background:C.acc,border:"none",color:"#fff"},
+    setup:{padding:"20px 16px",display:"flex",flexDirection:"column",gap:16},
+    label:{fontSize:11,textTransform:"uppercase",letterSpacing:1,color:C.muted,fontWeight:700},
+    cntRow:{display:"flex",gap:10},
+    cntBtn:{flex:1,padding:"13px 6px",borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontSize:16,fontWeight:800},
+    cntBtnA:{background:theme==="dark"?"rgba(56,189,248,0.15)":"rgba(2,132,199,0.1)",border:`1.5px solid ${C.acc}`,color:C.acc},
+    sel:{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:"13px 14px",color:C.text,fontSize:13,width:"100%"},
+    startBtn:{background:"linear-gradient(135deg,#5b21b6,#8b5cf6)",border:"none",borderRadius:14,padding:"16px",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer",marginTop:4},
+    examProg:{flex:1,textAlign:"center",fontSize:14,fontWeight:800,color:C.text},
+    examTimer:{fontSize:13,color:C.yellow,fontWeight:800},
+    examBar:{height:3,background:C.sur},
+    examFill:{height:"100%",background:C.acc,transition:"width 0.3s"},
+    navBtnSubmit:{background:"linear-gradient(135deg,#5b21b6,#8b5cf6)",border:"none",color:"#fff"},
+    resCard:{padding:"20px 16px"},
+    bigScore:{fontSize:76,fontWeight:900,textAlign:"center",lineHeight:1,marginBottom:4},
+    resMeta:{display:"flex",justifyContent:"center",gap:20,fontSize:13,color:C.muted,marginBottom:16},
+    reviewList:{display:"flex",flexDirection:"column",gap:7,marginBottom:20},
+    revItem:{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:10,border:"1px solid"},
+    revOk:{background:theme==="dark"?"rgba(52,211,153,0.07)":"rgba(5,150,105,0.05)",borderColor:theme==="dark"?"rgba(52,211,153,0.25)":"rgba(5,150,105,0.3)"},
+    revBad:{background:theme==="dark"?"rgba(248,113,113,0.07)":"rgba(220,38,38,0.05)",borderColor:theme==="dark"?"rgba(248,113,113,0.25)":"rgba(220,38,38,0.3)"},
+    revSkip:{background:C.card,borderColor:C.border},
+    revNum:{fontSize:11,color:C.muted,fontWeight:700,flexShrink:0,width:36},
+    revTxt:{flex:1,fontSize:12,color:C.text},
+    revAns:{fontSize:13,fontWeight:800,flexShrink:0},
+    recBody:{padding:"16px"},
+    gRow:{display:"flex",gap:10,marginBottom:20},
+    gBox:{flex:1,background:C.card,borderRadius:12,padding:"14px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,border:`1px solid ${C.border}`},
+    gN:{fontSize:22,fontWeight:900,color:C.acc},
+    gL:{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:0.5,textAlign:"center"},
+    secTitle:{fontSize:12,fontWeight:800,color:C.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:10},
+    empty:{color:C.muted,fontSize:14,textAlign:"center",padding:"24px 0"},
+    exRec:{display:"flex",justifyContent:"space-between",alignItems:"center",background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:"13px 15px",marginBottom:8},
+    exRL:{display:"flex",flexDirection:"column",gap:3},
+    exRDate:{fontSize:13,fontWeight:600,color:C.text},
+    exRTopic:{fontSize:11,color:C.muted},
+    exRR:{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3},
+    exRScore:{fontSize:17,fontWeight:900},
+    exRTime:{fontSize:11,color:C.muted},
+    resetZone:{marginTop:24},
+    resetBtn:{width:"100%",padding:"14px",borderRadius:12,border:"1px solid rgba(248,113,113,0.35)",background:theme==="dark"?"rgba(248,113,113,0.07)":"rgba(220,38,38,0.04)",color:C.red,cursor:"pointer",fontSize:14,fontWeight:700},
+    confBox:{background:theme==="dark"?"rgba(248,113,113,0.09)":"rgba(220,38,38,0.04)",border:`1px solid ${C.red}`,borderRadius:12,padding:"16px"},
+    confTxt:{fontSize:14,color:C.text,marginBottom:12,textAlign:"center",margin:"0 0 12px"},
+    confBtns:{display:"flex",gap:10},
+    confY:{flex:1,padding:"12px",borderRadius:10,border:"none",background:C.red,color:"#fff",cursor:"pointer",fontWeight:800,fontSize:14},
+    confN:{flex:1,padding:"12px",borderRadius:10,border:`1px solid ${C.border}`,background:C.card,color:C.text,cursor:"pointer",fontWeight:800,fontSize:14},
+  };
 
   function startStudy(topic) {
     const pool = topic === "all" ? Q : Q.filter(q => q.topic === topic);
@@ -210,6 +229,12 @@ export default function App() {
 
   function resetAll() { setData({}); setConfirmReset(false); }
 
+  const ThemeToggle = () => (
+    <button style={s.themeBtn} onClick={toggleTheme} title="Cambiar tema">
+      {theme === "dark" ? "☀️" : "🌙"}
+    </button>
+  );
+
   if (screen === "home") return (
     <div style={s.app}>
       <div style={s.hero}>
@@ -222,6 +247,11 @@ export default function App() {
           <div style={s.stat}><span style={s.statN}>{accuracy}%</span><span style={s.statL}>Aciertos</span></div>
           <div style={s.statDiv}/>
           <div style={s.stat}><span style={s.statN}>{examHist.length}</span><span style={s.statL}>Exámenes</span></div>
+        </div>
+        <div style={{marginTop:16}}>
+          <button style={{...s.themeBtn,fontSize:14,padding:"6px 16px"}} onClick={toggleTheme}>
+            {theme === "dark" ? "☀️ Tema claro" : "🌙 Tema oscuro"}
+          </button>
         </div>
       </div>
       <div style={s.grid}>
@@ -251,7 +281,7 @@ export default function App() {
       <div style={s.topBar}>
         <button style={s.backBtn} onClick={() => setScreen("home")}>← Inicio</button>
         <h2 style={s.topTitle}>Temarios</h2>
-        <span style={s.topMeta}>{TOPICS.length}</span>
+        <ThemeToggle/>
       </div>
       <div style={s.tList}>
         {TOPICS.map(topic => {
@@ -291,7 +321,10 @@ export default function App() {
         <div style={s.topBar}>
           <button style={s.backBtn} onClick={() => setScreen("home")}>← Inicio</button>
           <span style={s.topTitle}>{sIdx+1} / {studyQ.length}</span>
-          <span style={s.topMeta}>#{q.num}</span>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={s.topMeta}>#{q.num}</span>
+            <ThemeToggle/>
+          </div>
         </div>
         <div style={s.cardWrap}>
           <div style={{marginBottom:10}}>
@@ -340,6 +373,7 @@ export default function App() {
       <div style={s.topBar}>
         <button style={s.backBtn} onClick={() => setScreen("home")}>← Inicio</button>
         <h2 style={s.topTitle}>Configurar Examen</h2>
+        <ThemeToggle/>
       </div>
       <div style={s.setup}>
         <span style={s.label}>Nº de preguntas</span>
@@ -368,6 +402,7 @@ export default function App() {
           <div style={s.topBar}>
             <button style={s.backBtn} onClick={() => setScreen("home")}>← Inicio</button>
             <h2 style={s.topTitle}>Resultado</h2>
+            <ThemeToggle/>
           </div>
           <div style={s.resCard}>
             <div style={{...s.bigScore,color:scoreColor}}>{score}%</div>
@@ -403,7 +438,10 @@ export default function App() {
         <div style={s.topBar}>
           <button style={s.backBtn} onClick={() => { setEActive(false); setScreen("home"); }}>✕</button>
           <span style={s.examProg}>{eIdx+1}/{examQ.length}</span>
-          <span style={s.examTimer}>⏱ {fmt(eTime)}</span>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={s.examTimer}>⏱ {fmt(eTime)}</span>
+            <ThemeToggle/>
+          </div>
         </div>
         <div style={s.examBar}><div style={{...s.examFill,width:`${((eIdx+1)/examQ.length)*100}%`}}/></div>
         <div style={s.cardWrap}>
@@ -439,6 +477,7 @@ export default function App() {
         <div style={s.topBar}>
           <button style={s.backBtn} onClick={() => setScreen("home")}>← Inicio</button>
           <h2 style={s.topTitle}>Mis Resultados</h2>
+          <ThemeToggle/>
         </div>
         <div style={s.recBody}>
           <div style={s.gRow}>
