@@ -54,6 +54,21 @@ const save = (s) => { try { localStorage.setItem(SK, JSON.stringify(s)); } catch
 const saveTheme = (t) => { try { localStorage.setItem(TK, t); } catch {} };
 const shuffle = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];} return b; };
 const fmt = s => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,"0")}`;
+const EXAM_COUNT = 100;
+const EXAM_DURATION = 3600;
+const DISPLAY_KEYS = ["a","b","c","d"];
+const getCorrectText = q => q.options[q.correct];
+const prepareQuestion = q => {
+  const correctText = getCorrectText(q);
+  const displayOpts = shuffle(Object.values(q.options)).map((text, i) => ({ key: DISPLAY_KEYS[i], text }));
+  return { ...q, correctText, displayOpts };
+};
+const isAnswerCorrect = (q, chosenKey) => {
+  if (!chosenKey || !q.displayOpts) return false;
+  const opt = q.displayOpts.find(o => o.key === chosenKey);
+  return opt?.text === q.correctText;
+};
+const getCorrectDisplayKey = q => q.displayOpts?.find(o => o.text === q.correctText)?.key;
 
 const DARK = {
   bg:"#080d1a", sur:"#0f172a", card:"#162032", border:"#1e2d42",
@@ -82,21 +97,24 @@ export default function App() {
   const [examAns, setExamAns] = useState({});
   const [eIdx, setEIdx] = useState(0);
   const [eSub, setESub] = useState(false);
-  const [eTime, setETime] = useState(0);
+  const [eTimeLeft, setETimeLeft] = useState(EXAM_DURATION);
   const [eActive, setEActive] = useState(false);
-  const [eCnt, setECnt] = useState(25);
-  const [eTopic, setETopic] = useState("all");
   const [confirmReset, setConfirmReset] = useState(false);
   const [activeSection, setActiveSection] = useState(null);
   const timer = useRef(null);
+  const submitExamRef = useRef(() => {});
 
   useEffect(() => { save(data); }, [data]);
   useEffect(() => { saveTheme(theme); }, [theme]);
   useEffect(() => {
-    if (eActive) { timer.current = setInterval(() => setETime(t => t+1), 1000); }
-    else clearInterval(timer.current);
+    if (!eActive) { clearInterval(timer.current); return; }
+    timer.current = setInterval(() => setETimeLeft(t => Math.max(0, t - 1)), 1000);
     return () => clearInterval(timer.current);
   }, [eActive]);
+
+  useEffect(() => {
+    if (eActive && eTimeLeft === 0 && examQ.length > 0 && !eSub) submitExamRef.current();
+  }, [eTimeLeft, eActive, eSub, examQ.length]);
 
   const toggleTheme = () => setTheme(t => t === "dark" ? "light" : "dark");
 
@@ -216,44 +234,46 @@ export default function App() {
     const wrong = shuffle(pool.filter(q => hist[q.num] && !hist[q.num].correct));
     const unseen = shuffle(pool.filter(q => !hist[q.num]));
     const ok = shuffle(pool.filter(q => hist[q.num]?.correct));
-    setStudyQ([...unseen, ...wrong, ...ok]);
+    setStudyQ([...unseen, ...wrong, ...ok].map(prepareQuestion));
     setSIdx(0); setChosen(null); setScreen("study");
   }
 
-  function handleAnswer(opt, correctOpt) {
+  function handleAnswer(chosenKey) {
     if (chosen) return;
-    setChosen(opt);
-    const correct = opt === correctOpt;
+    const q = studyQ[sIdx];
+    const correctKey = getCorrectDisplayKey(q);
+    setChosen(chosenKey);
+    const correct = isAnswerCorrect(q, chosenKey);
     setData(prev => ({
       ...prev,
-      history: { ...prev.history, [String(studyQ[sIdx].num)]: { correct, chosen: opt, correctOpt, ts: Date.now() } }
+      history: { ...prev.history, [String(q.num)]: { correct, chosen: chosenKey, correctOpt: correctKey, ts: Date.now() } }
     }));
   }
 
   function next() { setChosen(null); setSIdx(i => Math.min(i+1, studyQ.length-1)); }
   function prev() { setChosen(null); setSIdx(i => Math.max(i-1, 0)); }
 
-  function startExam(cnt, topic) {
-    const pool = getStudyPool(topic);
-    const qs = shuffle(pool).slice(0, Math.min(cnt, pool.length)).map(q => ({
-      ...q, shuffled: shuffle(Object.entries(q.options))
-    }));
+  function startOfficialExam() {
+    const qs = shuffle(Q).slice(0, EXAM_COUNT).map(prepareQuestion);
     setExamQ(qs); setExamAns({}); setEIdx(0); setESub(false);
-    setETime(0); setEActive(true); setScreen("exam");
+    setETimeLeft(EXAM_DURATION); setEActive(true); setScreen("exam");
   }
 
   function submitExam() {
+    if (eSub) return;
     setEActive(false);
     let correct = 0;
-    examQ.forEach(q => { if (examAns[q.num] === q.correct) correct++; });
+    examQ.forEach(q => { if (isAnswerCorrect(q, examAns[q.num])) correct++; });
     const total = examQ.length;
     const score = Math.round((correct/total)*100);
+    const timeUsed = EXAM_DURATION - eTimeLeft;
     setData(prev => ({
       ...prev,
-      exams: [{ date: Date.now(), total, correct, answered: Object.keys(examAns).length, score, time: eTime, topic: eTopic }, ...(prev.exams||[])]
+      exams: [{ date: Date.now(), total, correct, answered: Object.keys(examAns).length, score, time: timeUsed, topic: "Examen oficial" }, ...(prev.exams||[])]
     }));
     setESub(true);
   }
+  submitExamRef.current = submitExam;
 
   function resetAll() { setData({}); setConfirmReset(false); }
 
@@ -387,8 +407,7 @@ export default function App() {
 
   if (screen === "study" && studyQ.length > 0) {
     const q = studyQ[sIdx];
-    const opts = Object.entries(q.options);
-    const correctOpt = q.correct;
+    const correctKey = getCorrectDisplayKey(q);
     const prevResult = hist[String(q.num)];
     return (
       <div style={s.app}>
@@ -413,24 +432,24 @@ export default function App() {
           <div style={s.qNum}>Pregunta #{q.num}</div>
           <div style={s.qTxt}>{q.text}</div>
           <div style={s.opts}>
-            {opts.map(([key, val]) => {
+            {q.displayOpts.map(({key, text}) => {
               let st = {...s.opt};
               let ks = {};
               if (chosen) {
-                if (key === correctOpt) { st = {...s.opt,...s.optOk}; ks = s.optKeyOk; }
+                if (key === correctKey) { st = {...s.opt,...s.optOk}; ks = s.optKeyOk; }
                 else if (key === chosen) { st = {...s.opt,...s.optBad}; ks = s.optKeyBad; }
               } else if (chosen === key) { st = {...s.opt,...s.optSel}; }
               return (
-                <button key={key} style={st} onClick={() => handleAnswer(key, correctOpt)}>
+                <button key={key} style={st} onClick={() => handleAnswer(key)}>
                   <span style={{...s.optKey,...ks}}>{key.toUpperCase()}</span>
-                  <span style={s.optVal}>{val}</span>
+                  <span style={s.optVal}>{text}</span>
                 </button>
               );
             })}
           </div>
           {chosen && (
-            <div style={chosen === correctOpt ? s.resOk : s.resBad}>
-              {chosen === correctOpt ? "✅ ¡Correcto!" : `❌ Incorrecto — Correcta: ${correctOpt?.toUpperCase()}`}
+            <div style={chosen === correctKey ? s.resOk : s.resBad}>
+              {chosen === correctKey ? "✅ ¡Correcto!" : `❌ Incorrecto — Correcta: ${correctKey?.toUpperCase()}`}
             </div>
           )}
         </div>
@@ -446,29 +465,20 @@ export default function App() {
     <div style={s.app}>
       <div style={s.topBar}>
         <button style={s.backBtn} onClick={() => setScreen("home")}>← Inicio</button>
-        <h2 style={s.topTitle}>Configurar Examen</h2>
+        <h2 style={s.topTitle}>Modo Examen</h2>
         <ThemeToggle/>
       </div>
       <div style={s.setup}>
-        <span style={s.label}>Nº de preguntas</span>
-        <div style={s.cntRow}>
-          {[10,25,50,100].map(n => (
-            <button key={n} style={eCnt===n?{...s.cntBtn,...s.cntBtnA}:s.cntBtn} onClick={() => setECnt(n)}>{n}</button>
-          ))}
+        <div style={{...s.tCard,marginBottom:16,cursor:"default"}}>
+          <div style={{fontSize:15,fontWeight:800,color:C.text,marginBottom:12}}>📝 Examen oficial simulado</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,fontSize:13,color:C.subtext,lineHeight:1.5}}>
+            <span>✅ <strong>{EXAM_COUNT} preguntas</strong> aleatorias de las {Q.length} del banco</span>
+            <span>🔀 Sin filtro por temario — mezcla específico y común</span>
+            <span>⏱ <strong>1 hora</strong> de tiempo (cuenta atrás visible)</span>
+            <span>🔀 Las opciones de respuesta se barajan en cada pregunta</span>
+          </div>
         </div>
-        <span style={s.label}>Temario</span>
-        <select style={s.sel} value={eTopic} onChange={e => setETopic(e.target.value)}>
-          <option value="all">Todas las preguntas ({Q.length})</option>
-          <option value="section:especifico">📚 Temario Específico ({getSectionPool("especifico").length})</option>
-          <option value="section:comun">📋 Temario Común ({getSectionPool("comun").length})</option>
-          <optgroup label="Temario Específico">
-            {SPECIFIC_TOPICS.map(t => <option key={t} value={t}>{ICONS[t]} {t} ({Q.filter(q=>q.topic===t).length})</option>)}
-          </optgroup>
-          <optgroup label="Temario Común">
-            {COMUN_TOPICS.map(t => <option key={t} value={t}>{ICONS[t]} {t} ({Q.filter(q=>q.topic===t).length})</option>)}
-          </optgroup>
-        </select>
-        <button style={s.startBtn} onClick={() => startExam(eCnt, eTopic)}>🚀 Comenzar Examen</button>
+        <button style={s.startBtn} onClick={startOfficialExam}>🚀 Comenzar Examen</button>
       </div>
     </div>
   );
@@ -489,12 +499,13 @@ export default function App() {
             <div style={{...s.bigScore,color:scoreColor}}>{score}%</div>
             <div style={s.resMeta}>
               <span>✅ {lastExam?.correct}/{lastExam?.total} correctas</span>
-              <span>⏱ {fmt(eTime)}</span>
+              <span>⏱ {fmt(EXAM_DURATION - eTimeLeft)} / {fmt(EXAM_DURATION)}</span>
             </div>
             <div style={s.reviewList}>
               {examQ.map(q => {
                 const ans = examAns[q.num];
-                const isOk = ans === q.correct;
+                const correctKey = getCorrectDisplayKey(q);
+                const isOk = isAnswerCorrect(q, ans);
                 const isSkip = !ans;
                 return (
                   <div key={q.num} style={{...s.revItem,...(isSkip?s.revSkip:isOk?s.revOk:s.revBad)}}>
@@ -502,7 +513,7 @@ export default function App() {
                     <span style={s.revTxt}>{q.text.slice(0,55)}…</span>
                     <span style={{...s.revAns,color:isSkip?C.muted:isOk?C.green:C.red}}>
                       {ans?ans.toUpperCase():"—"}
-                      {!isSkip&&!isOk&&<span style={{color:C.muted,fontSize:11}}> ({q.correct?.toUpperCase()})</span>}
+                      {!isSkip&&!isOk&&<span style={{color:C.muted,fontSize:11}}> ({correctKey?.toUpperCase()})</span>}
                     </span>
                   </div>
                 );
@@ -520,7 +531,7 @@ export default function App() {
           <button style={s.backBtn} onClick={() => { setEActive(false); setScreen("home"); }}>✕</button>
           <span style={s.examProg}>{eIdx+1}/{examQ.length}</span>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={s.examTimer}>⏱ {fmt(eTime)}</span>
+            <span style={{...s.examTimer,color:eTimeLeft<=300?C.red:C.acc,fontWeight:800}}>⏱ {fmt(eTimeLeft)}</span>
             <ThemeToggle/>
           </div>
         </div>
@@ -531,12 +542,12 @@ export default function App() {
           <div style={s.qNum}>Pregunta #{q.num}</div>
           <div style={s.qTxt}>{q.text}</div>
           <div style={s.opts}>
-            {q.shuffled.map(([key, val]) => (
+            {q.displayOpts.map(({key, text}) => (
               <button key={key}
                 style={examAns[q.num]===key?{...s.opt,...s.optSel}:s.opt}
                 onClick={() => setExamAns(prev => ({...prev,[q.num]:key}))}>
                 <span style={s.optKey}>{key.toUpperCase()}</span>
-                <span style={s.optVal}>{val}</span>
+                <span style={s.optVal}>{text}</span>
               </button>
             ))}
           </div>
@@ -574,7 +585,7 @@ export default function App() {
               <div key={i} style={s.exRec}>
                 <div style={s.exRL}>
                   <span style={s.exRDate}>{new Date(ex.date).toLocaleDateString("es-ES",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
-                  <span style={s.exRTopic}>{ex.topic==="all"?"Todos los temarios":ex.topic}</span>
+                  <span style={s.exRTopic}>{ex.topic||"Examen"}</span>
                 </div>
                 <div style={s.exRR}>
                   <span style={{...s.exRScore,color:sc>=80?C.green:sc>=60?C.yellow:C.red}}>{sc}% · {ex.correct}/{ex.total}</span>
