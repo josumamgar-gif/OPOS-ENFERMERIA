@@ -56,6 +56,7 @@ const shuffle = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Mat
 const fmt = s => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,"0")}`;
 const EXAM_COUNT = 100;
 const EXAM_DURATION = 3600;
+const EXAM_WARN_TIME = 600;
 const DISPLAY_KEYS = ["a","b","c","d"];
 const getCorrectText = q => q.options[q.correct];
 const prepareQuestion = q => {
@@ -100,6 +101,7 @@ export default function App() {
   const [eTimeLeft, setETimeLeft] = useState(EXAM_DURATION);
   const [eActive, setEActive] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmExitExam, setConfirmExitExam] = useState(false);
   const [activeSection, setActiveSection] = useState(null);
   const timer = useRef(null);
   const submitExamRef = useRef(() => {});
@@ -115,6 +117,13 @@ export default function App() {
   useEffect(() => {
     if (eActive && eTimeLeft === 0 && examQ.length > 0 && !eSub) submitExamRef.current();
   }, [eTimeLeft, eActive, eSub, examQ.length]);
+
+  useEffect(() => {
+    if (!eActive || eSub) return;
+    const onLeave = (e) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", onLeave);
+    return () => window.removeEventListener("beforeunload", onLeave);
+  }, [eActive, eSub]);
 
   const toggleTheme = () => setTheme(t => t === "dark" ? "light" : "dark");
 
@@ -256,7 +265,14 @@ export default function App() {
   function startOfficialExam() {
     const qs = shuffle(Q).slice(0, EXAM_COUNT).map(prepareQuestion);
     setExamQ(qs); setExamAns({}); setEIdx(0); setESub(false);
-    setETimeLeft(EXAM_DURATION); setEActive(true); setScreen("exam");
+    setETimeLeft(EXAM_DURATION); setConfirmExitExam(false);
+    setEActive(true); setScreen("exam");
+  }
+
+  function leaveExam() {
+    setEActive(false); setConfirmExitExam(false);
+    setExamQ([]); setExamAns({}); setESub(false);
+    setScreen("home");
   }
 
   function submitExam() {
@@ -476,6 +492,8 @@ export default function App() {
             <span>🔀 Sin filtro por temario — mezcla específico y común</span>
             <span>⏱ <strong>1 hora</strong> de tiempo (cuenta atrás visible)</span>
             <span>🔀 Las opciones de respuesta se barajan en cada pregunta</span>
+            <span>⚠️ Aviso visual en los últimos 10 minutos</span>
+            <span>🚪 Confirmación obligatoria si intentas salir del examen</span>
           </div>
         </div>
         <button style={s.startBtn} onClick={startOfficialExam}>🚀 Comenzar Examen</button>
@@ -525,16 +543,45 @@ export default function App() {
       );
     }
     const q = examQ[eIdx];
+    const lastTenMin = eTimeLeft <= EXAM_WARN_TIME;
     return (
       <div style={s.app}>
         <div style={s.topBar}>
-          <button style={s.backBtn} onClick={() => { setEActive(false); setScreen("home"); }}>✕</button>
+          <button style={s.backBtn} onClick={() => setConfirmExitExam(true)}>✕</button>
           <span style={s.examProg}>{eIdx+1}/{examQ.length}</span>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{...s.examTimer,color:eTimeLeft<=300?C.red:C.acc,fontWeight:800}}>⏱ {fmt(eTimeLeft)}</span>
+            <span style={{...s.examTimer,color:lastTenMin?C.red:C.acc,fontWeight:800}}>⏱ {fmt(eTimeLeft)}</span>
             <ThemeToggle/>
           </div>
         </div>
+        {lastTenMin && (
+          <div style={{
+            margin:"0 16px 10px",padding:"10px 14px",borderRadius:12,
+            background:theme==="dark"?"rgba(251,191,36,0.15)":"rgba(217,119,6,0.12)",
+            border:`1px solid ${C.yellow}`,color:C.yellow,
+            fontSize:13,fontWeight:700,textAlign:"center"
+          }}>
+            ⚠️ Últimos 10 minutos — el examen se entregará automáticamente al llegar a 0:00
+          </div>
+        )}
+        {confirmExitExam && (
+          <div style={{
+            position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            padding:20,zIndex:100
+          }}>
+            <div style={{...s.confBox,maxWidth:360,width:"100%",background:C.card}}>
+              <p style={{...s.confTxt,fontWeight:700,fontSize:15}}>¿Abandonar el examen?</p>
+              <p style={{...s.confTxt,fontSize:13,color:C.muted,marginTop:-8}}>
+                Se perderá el progreso y no se guardará ningún resultado.
+              </p>
+              <div style={s.confBtns}>
+                <button style={s.confY} onClick={leaveExam}>Sí, abandonar</button>
+                <button style={s.confN} onClick={() => setConfirmExitExam(false)}>Continuar examen</button>
+              </div>
+            </div>
+          </div>
+        )}
         <div style={s.examBar}><div style={{...s.examFill,width:`${((eIdx+1)/examQ.length)*100}%`}}/></div>
         <div style={s.cardWrap}>
           <span style={s.tag}>{ICONS[q.topic]} {q.topic}</span>
