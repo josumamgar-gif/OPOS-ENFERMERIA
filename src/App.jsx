@@ -50,7 +50,13 @@ const SK = "enf_opos_v4";
 const TK = "enf_theme_v1";
 const load = () => { try { return JSON.parse(localStorage.getItem(SK)) || {}; } catch { return {}; } };
 const loadTheme = () => { try { return localStorage.getItem(TK) || "dark"; } catch { return "dark"; } };
-const save = (s) => { try { localStorage.setItem(SK, JSON.stringify(s)); } catch {} };
+const save = (s) => {
+  try { localStorage.setItem(SK, JSON.stringify(s)); return; } catch {}
+  try {
+    const trimmed = { ...s, exams: (s.exams || []).slice(0, 20) };
+    localStorage.setItem(SK, JSON.stringify(trimmed));
+  } catch {}
+};
 const saveTheme = (t) => { try { localStorage.setItem(TK, t); } catch {} };
 const shuffle = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];} return b; };
 const fmt = s => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,"0")}`;
@@ -88,8 +94,28 @@ const pickExamQuestions = (pool, count, exams) => {
   return shuffle(weighted.slice(0, count).map(x => x.q));
 };
 const serializeExamQuestion = (q, chosen) => ({
-  num: q.num, text: q.text, topic: q.topic,
-  correctText: q.correctText, displayOpts: q.displayOpts, chosen: chosen || null
+  num: q.num,
+  correctText: q.correctText,
+  order: q.displayOpts.map(o => o.text),
+  chosen: chosen || null
+});
+const restoreExamQuestion = (saved) => {
+  if (!saved) return null;
+  if (saved.displayOpts) return saved;
+  const base = Q.find(q => q.num === saved.num);
+  if (!base || !saved.order?.length) return null;
+  return {
+    num: saved.num,
+    text: base.text,
+    topic: base.topic,
+    correctText: saved.correctText,
+    displayOpts: saved.order.map((text, i) => ({ key: DISPLAY_KEYS[i], text })),
+    chosen: saved.chosen
+  };
+};
+const restoreExam = (ex) => ({
+  ...ex,
+  questions: (ex.questions || []).map(restoreExamQuestion).filter(Boolean)
 });
 
 const DARK = {
@@ -127,6 +153,8 @@ export default function App() {
   const [selectedExam, setSelectedExam] = useState(null);
   const [reviewIdx, setReviewIdx] = useState(0);
   const [reviewMode, setReviewMode] = useState("list");
+  const [reviewFilter, setReviewFilter] = useState("all");
+  const [lastSubmittedExam, setLastSubmittedExam] = useState(null);
   const timer = useRef(null);
   const submitExamRef = useRef(() => {});
 
@@ -294,9 +322,11 @@ export default function App() {
   }
 
   function openExamReview(ex) {
-    setSelectedExam(ex);
+    const saved = (data.exams || []).find(e => (ex.id && e.id === ex.id) || e.date === ex.date) || ex;
+    setSelectedExam(restoreExam(saved));
     setReviewIdx(0);
-    setReviewMode(ex.questions?.length ? "list" : "list");
+    setReviewFilter("all");
+    setReviewMode("list");
     setScreen("examReview");
   }
 
@@ -314,14 +344,17 @@ export default function App() {
     const total = examQ.length;
     const score = Math.round((correct/total)*100);
     const timeUsed = EXAM_DURATION - eTimeLeft;
+    const id = Date.now();
     const questions = examQ.map(q => serializeExamQuestion(q, examAns[q.num]));
+    const examRecord = {
+      id, date: id, total, correct,
+      answered: Object.keys(examAns).length, score, time: timeUsed,
+      topic: "Examen oficial", questions
+    };
+    setLastSubmittedExam(restoreExam(examRecord));
     setData(prev => ({
       ...prev,
-      exams: [{
-        date: Date.now(), total, correct,
-        answered: Object.keys(examAns).length, score, time: timeUsed,
-        topic: "Examen oficial", questions
-      }, ...(prev.exams || []).slice(0, 49)]
+      exams: [examRecord, ...(prev.exams || []).slice(0, 29)]
     }));
     setESub(true);
   }
@@ -574,10 +607,12 @@ export default function App() {
                 );
               })}
             </div>
-            <button style={s.startBtn} onClick={() => openExamReview({
-              ...lastExam,
-              questions: examQ.map(q => serializeExamQuestion(q, examAns[q.num]))
-            })}>📋 Ver preguntas del examen</button>
+            <button style={s.startBtn} onClick={() => lastSubmittedExam ? openExamReview(lastSubmittedExam) : openExamReview({ ...lastExam, questions: examQ.map(q => serializeExamQuestion(q, examAns[q.num])) })}>
+              📋 Ver preguntas de este examen
+            </button>
+            <button style={{...s.startBtn,marginTop:10,background:theme==="dark"?C.sur:C.border,color:C.text}} onClick={() => setScreen("records")}>
+              🏆 Ir a Resultados (queda guardado)
+            </button>
             <button style={{...s.startBtn,marginTop:10,background:theme==="dark"?C.sur:C.border,color:C.text}} onClick={() => setScreen("examSetup")}>Nuevo Examen</button>
           </div>
         </div>
@@ -655,6 +690,22 @@ export default function App() {
     const items = selectedExam.questions || [];
     const sc = selectedExam.score ?? 0;
     const scoreColor = sc>=80?C.green:sc>=60?C.yellow:C.red;
+    const okN = items.filter(q => isReviewCorrect(q)).length;
+    const badN = items.filter(q => q.chosen && !isReviewCorrect(q)).length;
+    const skipN = items.filter(q => !q.chosen).length;
+    const filtered = items.filter(q => {
+      if (reviewFilter === "ok") return isReviewCorrect(q);
+      if (reviewFilter === "bad") return q.chosen && !isReviewCorrect(q);
+      if (reviewFilter === "skip") return !q.chosen;
+      return true;
+    });
+    const filtBtn = (id, label) => (
+      <button key={id} onClick={() => setReviewFilter(id)} style={{
+        padding:"6px 12px",borderRadius:20,border:`1px solid ${reviewFilter===id?C.acc:C.border}`,
+        background:reviewFilter===id?(theme==="dark"?"rgba(56,189,248,0.15)":"rgba(2,132,199,0.1)"):C.card,
+        color:reviewFilter===id?C.acc:C.muted,fontSize:11,fontWeight:700,cursor:"pointer"
+      }}>{label}</button>
+    );
     if (!items.length) return (
       <div style={s.app}>
         <div style={s.topBar}>
@@ -662,14 +713,14 @@ export default function App() {
           <h2 style={s.topTitle}>Detalle examen</h2>
           <ThemeToggle/>
         </div>
-        <p style={{...s.empty,padding:40}}>Este examen no tiene el detalle guardado (examen anterior a la actualización).</p>
+        <p style={{...s.empty,padding:40}}>Este examen es anterior y no guardó las preguntas. Haz un examen nuevo: quedará guardado para siempre en Resultados.</p>
       </div>
     );
     if (reviewMode === "list") return (
       <div style={s.app}>
         <div style={s.topBar}>
           <button style={s.backBtn} onClick={() => setScreen("records")}>← Resultados</button>
-          <h2 style={s.topTitle}>Examen</h2>
+          <h2 style={s.topTitle}>Registro del examen</h2>
           <ThemeToggle/>
         </div>
         <div style={{padding:"12px 16px 0"}}>
@@ -678,19 +729,27 @@ export default function App() {
               <div>
                 <div style={{fontSize:12,color:C.muted}}>{new Date(selectedExam.date).toLocaleDateString("es-ES",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</div>
                 <div style={{fontSize:22,fontWeight:900,color:scoreColor,marginTop:4}}>{sc}% · {selectedExam.correct}/{selectedExam.total}</div>
+                <div style={{fontSize:12,color:C.subtext,marginTop:6}}>✅ {okN} acertadas · ❌ {badN} falladas · — {skipN} sin responder</div>
               </div>
               <span style={{fontSize:12,color:C.muted}}>⏱ {fmt(selectedExam.time)}</span>
             </div>
           </div>
-          <p style={{...s.secTitle,marginBottom:8}}>Preguntas — pulsa para ver detalle</p>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+            {filtBtn("all", `Todas (${items.length})`)}
+            {filtBtn("ok", `✅ Acertadas (${okN})`)}
+            {filtBtn("bad", `❌ Falladas (${badN})`)}
+            {filtBtn("skip", `— Sin responder (${skipN})`)}
+          </div>
         </div>
-        <div style={{...s.reviewList,paddingTop:0,maxHeight:"calc(100vh - 220px)",overflowY:"auto"}}>
-          {items.map((q, i) => {
+        <div style={{...s.reviewList,paddingTop:0,maxHeight:"calc(100vh - 280px)",overflowY:"auto"}}>
+          {filtered.length === 0 && <p style={s.empty}>No hay preguntas en este filtro</p>}
+          {filtered.map((q) => {
+            const i = items.indexOf(q);
             const isOk = isReviewCorrect(q);
             const isSkip = !q.chosen;
             const correctKey = getCorrectDisplayKey(q);
             return (
-              <button key={q.num} style={{...s.revItem,...(isSkip?s.revSkip:isOk?s.revOk:s.revBad),width:"100%",cursor:"pointer",marginBottom:8}} onClick={() => { setReviewIdx(i); setReviewMode("detail"); }}>
+              <button key={`${q.num}-${i}`} style={{...s.revItem,...(isSkip?s.revSkip:isOk?s.revOk:s.revBad),width:"100%",cursor:"pointer",marginBottom:8}} onClick={() => { setReviewIdx(i); setReviewMode("detail"); }}>
                 <span style={s.revNum}>{i+1}</span>
                 <span style={{...s.revTxt,textAlign:"left"}}>#{q.num} · {q.text.slice(0,50)}…</span>
                 <span style={{...s.revAns,color:isSkip?C.muted:isOk?C.green:C.red}}>
@@ -759,18 +818,26 @@ export default function App() {
             <div style={s.gBox}><span style={s.gN}>{totalCorrect}</span><span style={s.gL}>Correctas</span></div>
             <div style={s.gBox}><span style={{...s.gN,color:accuracy>=70?C.green:accuracy>=50?C.yellow:C.red}}>{accuracy}%</span><span style={s.gL}>Precisión</span></div>
           </div>
-          <p style={s.secTitle}>Historial de Exámenes — pulsa para ver detalle</p>
+          <p style={s.secTitle}>Exámenes realizados</p>
+          <p style={{fontSize:12,color:C.muted,margin:"-6px 0 12px"}}>Pulsa un examen para ver las {EXAM_COUNT} preguntas, aciertos y fallos cuando quieras.</p>
           {examHist.length === 0 && <p style={s.empty}>Aún no has hecho ningún examen</p>}
           {examHist.map((ex,i) => {
             const sc = ex.score;
+            const restored = restoreExam(ex);
+            const qs = restored.questions || [];
+            const okN = qs.filter(q => isReviewCorrect(q)).length;
+            const badN = qs.filter(q => q.chosen && !isReviewCorrect(q)).length;
+            const hasDetail = qs.length > 0;
             return (
-              <button key={i} style={{...s.exRec,width:"100%",cursor:"pointer",textAlign:"left"}} onClick={() => openExamReview(ex)}>
+              <button key={ex.id || i} style={{...s.exRec,width:"100%",cursor:"pointer",textAlign:"left",marginBottom:10}} onClick={() => openExamReview(ex)}>
                 <div style={s.exRL}>
-                  <span style={s.exRDate}>{new Date(ex.date).toLocaleDateString("es-ES",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
-                  <span style={s.exRTopic}>{ex.topic||"Examen"}{ex.questions?.length ? " · 📋 Ver preguntas" : ""}</span>
+                  <span style={s.exRDate}>{new Date(ex.date).toLocaleDateString("es-ES",{day:"2-digit",month:"short",year:"2-digit",hour:"2-digit",minute:"2-digit"})}</span>
+                  <span style={{...s.exRScore,color:sc>=80?C.green:sc>=60?C.yellow:C.red,fontSize:16}}>{sc}% · {ex.correct}/{ex.total}</span>
+                  {hasDetail
+                    ? <span style={{fontSize:11,color:C.subtext,marginTop:4}}>✅ {okN} · ❌ {badN} · 📋 {qs.length} preguntas guardadas — Ver detalle →</span>
+                    : <span style={{fontSize:11,color:C.muted,marginTop:4}}>Sin preguntas guardadas (examen antiguo)</span>}
                 </div>
                 <div style={s.exRR}>
-                  <span style={{...s.exRScore,color:sc>=80?C.green:sc>=60?C.yellow:C.red}}>{sc}% · {ex.correct}/{ex.total}</span>
                   <span style={s.exRTime}>⏱ {fmt(ex.time)}</span>
                 </div>
               </button>
