@@ -70,6 +70,27 @@ const isAnswerCorrect = (q, chosenKey) => {
   return opt?.text === q.correctText;
 };
 const getCorrectDisplayKey = q => q.displayOpts?.find(o => o.text === q.correctText)?.key;
+const isReviewCorrect = (q) => {
+  if (!q?.chosen || !q.displayOpts) return false;
+  const opt = q.displayOpts.find(o => o.key === q.chosen);
+  return opt?.text === q.correctText;
+};
+const pickExamQuestions = (pool, count, exams) => {
+  const recentNums = new Set();
+  exams.slice(0, 6).forEach(ex => (ex.questions || []).forEach(q => recentNums.add(q.num)));
+  const freq = {};
+  exams.forEach(ex => (ex.questions || []).forEach(q => { freq[q.num] = (freq[q.num] || 0) + 1; }));
+  const weighted = pool.map(q => ({
+    q,
+    w: (recentNums.has(q.num) ? 80 : 0) + (freq[q.num] || 0) * 12 + Math.random() * 8
+  }));
+  weighted.sort((a, b) => a.w - b.w);
+  return shuffle(weighted.slice(0, count).map(x => x.q));
+};
+const serializeExamQuestion = (q, chosen) => ({
+  num: q.num, text: q.text, topic: q.topic,
+  correctText: q.correctText, displayOpts: q.displayOpts, chosen: chosen || null
+});
 
 const DARK = {
   bg:"#080d1a", sur:"#0f172a", card:"#162032", border:"#1e2d42",
@@ -103,6 +124,9 @@ export default function App() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmExitExam, setConfirmExitExam] = useState(false);
   const [activeSection, setActiveSection] = useState(null);
+  const [selectedExam, setSelectedExam] = useState(null);
+  const [reviewIdx, setReviewIdx] = useState(0);
+  const [reviewMode, setReviewMode] = useState("list");
   const timer = useRef(null);
   const submitExamRef = useRef(() => {});
 
@@ -263,10 +287,17 @@ export default function App() {
   function prev() { setChosen(null); setSIdx(i => Math.max(i-1, 0)); }
 
   function startOfficialExam() {
-    const qs = shuffle(Q).slice(0, EXAM_COUNT).map(prepareQuestion);
+    const qs = pickExamQuestions(Q, EXAM_COUNT, data.exams || []).map(prepareQuestion);
     setExamQ(qs); setExamAns({}); setEIdx(0); setESub(false);
     setETimeLeft(EXAM_DURATION); setConfirmExitExam(false);
     setEActive(true); setScreen("exam");
+  }
+
+  function openExamReview(ex) {
+    setSelectedExam(ex);
+    setReviewIdx(0);
+    setReviewMode(ex.questions?.length ? "list" : "list");
+    setScreen("examReview");
   }
 
   function leaveExam() {
@@ -283,9 +314,14 @@ export default function App() {
     const total = examQ.length;
     const score = Math.round((correct/total)*100);
     const timeUsed = EXAM_DURATION - eTimeLeft;
+    const questions = examQ.map(q => serializeExamQuestion(q, examAns[q.num]));
     setData(prev => ({
       ...prev,
-      exams: [{ date: Date.now(), total, correct, answered: Object.keys(examAns).length, score, time: timeUsed, topic: "Examen oficial" }, ...(prev.exams||[])]
+      exams: [{
+        date: Date.now(), total, correct,
+        answered: Object.keys(examAns).length, score, time: timeUsed,
+        topic: "Examen oficial", questions
+      }, ...(prev.exams || []).slice(0, 49)]
     }));
     setESub(true);
   }
@@ -494,6 +530,7 @@ export default function App() {
             <span>🔀 Las opciones de respuesta se barajan en cada pregunta</span>
             <span>⚠️ Aviso visual en los últimos 10 minutos</span>
             <span>🚪 Confirmación obligatoria si intentas salir del examen</span>
+            <span>🎲 Prioriza preguntas menos repetidas entre exámenes</span>
           </div>
         </div>
         <button style={s.startBtn} onClick={startOfficialExam}>🚀 Comenzar Examen</button>
@@ -537,7 +574,11 @@ export default function App() {
                 );
               })}
             </div>
-            <button style={s.startBtn} onClick={() => setScreen("examSetup")}>Nuevo Examen</button>
+            <button style={s.startBtn} onClick={() => openExamReview({
+              ...lastExam,
+              questions: examQ.map(q => serializeExamQuestion(q, examAns[q.num]))
+            })}>📋 Ver preguntas del examen</button>
+            <button style={{...s.startBtn,marginTop:10,background:theme==="dark"?C.sur:C.border,color:C.text}} onClick={() => setScreen("examSetup")}>Nuevo Examen</button>
           </div>
         </div>
       );
@@ -610,6 +651,100 @@ export default function App() {
     );
   }
 
+  if (screen === "examReview" && selectedExam) {
+    const items = selectedExam.questions || [];
+    const sc = selectedExam.score ?? 0;
+    const scoreColor = sc>=80?C.green:sc>=60?C.yellow:C.red;
+    if (!items.length) return (
+      <div style={s.app}>
+        <div style={s.topBar}>
+          <button style={s.backBtn} onClick={() => setScreen("records")}>← Resultados</button>
+          <h2 style={s.topTitle}>Detalle examen</h2>
+          <ThemeToggle/>
+        </div>
+        <p style={{...s.empty,padding:40}}>Este examen no tiene el detalle guardado (examen anterior a la actualización).</p>
+      </div>
+    );
+    if (reviewMode === "list") return (
+      <div style={s.app}>
+        <div style={s.topBar}>
+          <button style={s.backBtn} onClick={() => setScreen("records")}>← Resultados</button>
+          <h2 style={s.topTitle}>Examen</h2>
+          <ThemeToggle/>
+        </div>
+        <div style={{padding:"12px 16px 0"}}>
+          <div style={{...s.tCard,cursor:"default",marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:12,color:C.muted}}>{new Date(selectedExam.date).toLocaleDateString("es-ES",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</div>
+                <div style={{fontSize:22,fontWeight:900,color:scoreColor,marginTop:4}}>{sc}% · {selectedExam.correct}/{selectedExam.total}</div>
+              </div>
+              <span style={{fontSize:12,color:C.muted}}>⏱ {fmt(selectedExam.time)}</span>
+            </div>
+          </div>
+          <p style={{...s.secTitle,marginBottom:8}}>Preguntas — pulsa para ver detalle</p>
+        </div>
+        <div style={{...s.reviewList,paddingTop:0,maxHeight:"calc(100vh - 220px)",overflowY:"auto"}}>
+          {items.map((q, i) => {
+            const isOk = isReviewCorrect(q);
+            const isSkip = !q.chosen;
+            const correctKey = getCorrectDisplayKey(q);
+            return (
+              <button key={q.num} style={{...s.revItem,...(isSkip?s.revSkip:isOk?s.revOk:s.revBad),width:"100%",cursor:"pointer",marginBottom:8}} onClick={() => { setReviewIdx(i); setReviewMode("detail"); }}>
+                <span style={s.revNum}>{i+1}</span>
+                <span style={{...s.revTxt,textAlign:"left"}}>#{q.num} · {q.text.slice(0,50)}…</span>
+                <span style={{...s.revAns,color:isSkip?C.muted:isOk?C.green:C.red}}>
+                  {isSkip ? "—" : isOk ? "✓" : "✗"}
+                  {!isSkip && <span style={{fontSize:10,marginLeft:4}}>{q.chosen?.toUpperCase()}{!isOk && `→${correctKey?.toUpperCase()}`}</span>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+    const rq = items[reviewIdx];
+    const correctKey = getCorrectDisplayKey(rq);
+    const isOk = isReviewCorrect(rq);
+    const isSkip = !rq.chosen;
+    return (
+      <div style={s.app}>
+        <div style={s.topBar}>
+          <button style={s.backBtn} onClick={() => setReviewMode("list")}>← Lista</button>
+          <span style={s.topTitle}>{reviewIdx+1} / {items.length}</span>
+          <ThemeToggle/>
+        </div>
+        <div style={s.cardWrap}>
+          <span style={s.tag}>{ICONS[rq.topic]} {rq.topic}</span>
+          <div style={s.qNum}>Pregunta #{rq.num}</div>
+          <div style={s.qTxt}>{rq.text}</div>
+          <div style={s.opts}>
+            {rq.displayOpts.map(({key, text}) => {
+              let st = {...s.opt, cursor:"default"};
+              let ks = {};
+              if (key === correctKey) { st = {...st,...s.optOk}; ks = s.optKeyOk; }
+              else if (key === rq.chosen && !isOk) { st = {...st,...s.optBad}; ks = s.optKeyBad; }
+              else if (key === rq.chosen) { st = {...st,...s.optSel}; }
+              return (
+                <div key={key} style={st}>
+                  <span style={{...s.optKey,...ks}}>{key.toUpperCase()}</span>
+                  <span style={s.optVal}>{text}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div style={isSkip ? {...s.resBad,borderColor:C.muted,color:C.muted} : isOk ? s.resOk : s.resBad}>
+            {isSkip ? "⏭ Sin responder" : isOk ? "✅ Correcta" : `❌ Incorrecta — Tu respuesta: ${rq.chosen?.toUpperCase()} · Correcta: ${correctKey?.toUpperCase()}`}
+          </div>
+        </div>
+        <div style={s.navRow}>
+          <button style={s.navBtn} onClick={() => setReviewIdx(i => Math.max(0, i-1))} disabled={reviewIdx===0}>←</button>
+          <button style={{...s.navBtn,...s.navBtnPri}} onClick={() => setReviewIdx(i => Math.min(items.length-1, i+1))} disabled={reviewIdx===items.length-1}>Siguiente →</button>
+        </div>
+      </div>
+    );
+  }
+
   if (screen === "records") {
     return (
       <div style={s.app}>
@@ -624,21 +759,21 @@ export default function App() {
             <div style={s.gBox}><span style={s.gN}>{totalCorrect}</span><span style={s.gL}>Correctas</span></div>
             <div style={s.gBox}><span style={{...s.gN,color:accuracy>=70?C.green:accuracy>=50?C.yellow:C.red}}>{accuracy}%</span><span style={s.gL}>Precisión</span></div>
           </div>
-          <p style={s.secTitle}>Historial de Exámenes</p>
+          <p style={s.secTitle}>Historial de Exámenes — pulsa para ver detalle</p>
           {examHist.length === 0 && <p style={s.empty}>Aún no has hecho ningún examen</p>}
           {examHist.map((ex,i) => {
             const sc = ex.score;
             return (
-              <div key={i} style={s.exRec}>
+              <button key={i} style={{...s.exRec,width:"100%",cursor:"pointer",textAlign:"left"}} onClick={() => openExamReview(ex)}>
                 <div style={s.exRL}>
                   <span style={s.exRDate}>{new Date(ex.date).toLocaleDateString("es-ES",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span>
-                  <span style={s.exRTopic}>{ex.topic||"Examen"}</span>
+                  <span style={s.exRTopic}>{ex.topic||"Examen"}{ex.questions?.length ? " · 📋 Ver preguntas" : ""}</span>
                 </div>
                 <div style={s.exRR}>
                   <span style={{...s.exRScore,color:sc>=80?C.green:sc>=60?C.yellow:C.red}}>{sc}% · {ex.correct}/{ex.total}</span>
                   <span style={s.exRTime}>⏱ {fmt(ex.time)}</span>
                 </div>
-              </div>
+              </button>
             );
           })}
           <div style={s.resetZone}>
