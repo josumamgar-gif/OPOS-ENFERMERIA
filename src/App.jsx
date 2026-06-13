@@ -256,6 +256,16 @@ export default function App() {
     examBar:{height:3,background:C.sur},
     examFill:{height:"100%",background:C.acc,transition:"width 0.3s"},
     navBtnSubmit:{background:"linear-gradient(135deg,#5b21b6,#8b5cf6)",border:"none",color:"#fff"},
+    examGridSection:{padding:"0 16px 16px"},
+    examGridLabel:{fontSize:11,textTransform:"uppercase",letterSpacing:1,color:C.muted,fontWeight:700,marginBottom:8},
+    examGridMeta:{fontSize:12,color:C.muted,marginBottom:10},
+    examGrid:{display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:6},
+    examGridBtn:{aspectRatio:"1",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontSize:11,fontWeight:700,padding:0,transition:"all 0.12s"},
+    examGridBtnCur:{border:`2px solid ${C.acc}`,background:theme==="dark"?"rgba(56,189,248,0.2)":"rgba(2,132,199,0.15)",color:C.acc,fontWeight:900},
+    examGridBtnAns:{borderColor:theme==="dark"?"rgba(52,211,153,0.4)":"rgba(5,150,105,0.35)",background:theme==="dark"?"rgba(52,211,153,0.1)":"rgba(5,150,105,0.08)",color:C.green},
+    examGridBtnCurAns:{border:`2px solid ${C.acc}`,background:theme==="dark"?"rgba(56,189,248,0.2)":"rgba(2,132,199,0.15)",color:C.acc,fontWeight:900,boxShadow:`inset 0 0 0 1px ${C.green}`},
+    examSubmitRow:{padding:"0 16px 16px"},
+    examSubmitBtn:{width:"100%",padding:"14px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#5b21b6,#8b5cf6)",color:"#fff",cursor:"pointer",fontSize:15,fontWeight:800},
     resCard:{padding:"20px 16px"},
     bigScore:{fontSize:76,fontWeight:900,textAlign:"center",lineHeight:1,marginBottom:4},
     resMeta:{display:"flex",justifyContent:"center",gap:20,fontSize:13,color:C.muted,marginBottom:16},
@@ -620,6 +630,8 @@ export default function App() {
     }
     const q = examQ[eIdx];
     const lastTenMin = eTimeLeft <= EXAM_WARN_TIME;
+    const answeredCount = examQ.filter(eq => examAns[eq.num]).length;
+    const allAnswered = examQ.length > 0 && answeredCount === examQ.length;
     return (
       <div style={s.app}>
         <div style={s.topBar}>
@@ -675,12 +687,42 @@ export default function App() {
             ))}
           </div>
         </div>
+        <div style={s.examGridSection}>
+          <div style={s.examGridLabel}>Ir a pregunta</div>
+          <div style={s.examGridMeta}>{answeredCount}/{examQ.length} respondidas</div>
+          <div style={s.examGrid}>
+            {examQ.map((eq, idx) => {
+              const isCur = idx === eIdx;
+              const isAns = !!examAns[eq.num];
+              const btnStyle = isCur
+                ? (isAns ? s.examGridBtnCurAns : s.examGridBtnCur)
+                : (isAns ? s.examGridBtnAns : s.examGridBtn);
+              return (
+                <button
+                  key={`${eq.num}-${idx}`}
+                  type="button"
+                  style={{...s.examGridBtn,...btnStyle}}
+                  onClick={() => setEIdx(idx)}
+                  title={`Pregunta ${idx + 1} · #${eq.num}${isAns ? ` · ${examAns[eq.num].toUpperCase()}` : ""}`}
+                >
+                  {idx + 1}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        {allAnswered && (
+          <div style={s.examSubmitRow}>
+            <button type="button" style={s.examSubmitBtn} onClick={submitExam}>
+              Presentar examen 📋
+            </button>
+          </div>
+        )}
         <div style={s.navRow}>
           <button style={s.navBtn} onClick={() => setEIdx(i=>Math.max(0,i-1))} disabled={eIdx===0}>←</button>
-          {eIdx < examQ.length-1
-            ? <button style={{...s.navBtn,...s.navBtnPri}} onClick={() => setEIdx(i=>i+1)}>Siguiente →</button>
-            : <button style={{...s.navBtn,...s.navBtnSubmit}} onClick={submitExam}>Entregar 📋</button>
-          }
+          {eIdx < examQ.length-1 && (
+            <button style={{...s.navBtn,...s.navBtnPri}} onClick={() => setEIdx(i=>i+1)}>Siguiente →</button>
+          )}
         </div>
       </div>
     );
